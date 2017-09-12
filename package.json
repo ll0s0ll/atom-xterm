@@ -36,7 +36,7 @@
     "node-pty": "^0.7.0",
     "uuid": "^3.1.0",
     "whatwg-url": "^6.1.0",
-    "xterm": "^2.9.2"
+    "xterm": "git+https://github.com/sourcelair/xterm.js.git#v3"
   },
   "devDependencies": {
     "atom-jasmine2-test-runner": "^1.1.2",
@@ -45,7 +45,9 @@
   },
   "scripts": {
     "move-winpty-binaries": "node scripts/move-winpty-binaries.js",
+    "build-xterm-v3": "node scripts/build-xterm-v3.js",
     "preinstall": "npm run move-winpty-binaries",
+    "postinstall": "npm run build-xterm-v3",
     "preuninstall": "npm run move-winpty-binaries"
   }
 }
