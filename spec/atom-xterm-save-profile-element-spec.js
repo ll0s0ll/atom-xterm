@@ -17,9 +17,27 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import { SpecReporter } from 'jasmine-spec-reporter';
-const { createRunner } = require('atom-jasmine2-test-runner');
+import AtomXtermSaveProfileElement from '../lib/atom-xterm-save-profile-element';
 
-module.exports = createRunner({
-    reporter: new SpecReporter
+describe('AtomXtermSaveProfileElement', () => {
+    this.model;
+
+    beforeEach(() => {
+        this.model = jasmine.createSpyObj('model', ['setElement']);
+    });
+
+    it('initialize()', () => {
+        let element = new AtomXtermSaveProfileElement;
+        element.initialize(this.model);
+        expect(element.messageDiv.textContent).toBe('Enter new profile name');
+    });
+
+    it('setNewTextbox()', () => {
+        let element = new AtomXtermSaveProfileElement;
+        element.initialize(this.model);
+        let textbox = jasmine.createSpyObj('textbox', ['getElement']);
+        textbox.getElement.and.returnValue(document.createElement('div'));
+        element.setNewTextbox(textbox);
+        expect(textbox.getElement).toHaveBeenCalled();
+    });
 });

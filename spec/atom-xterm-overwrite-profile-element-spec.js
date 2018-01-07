@@ -17,9 +17,28 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import { SpecReporter } from 'jasmine-spec-reporter';
-const { createRunner } = require('atom-jasmine2-test-runner');
+import AtomXtermOverwriteProfileElement from '../lib/atom-xterm-overwrite-profile-element';
 
-module.exports = createRunner({
-    reporter: new SpecReporter
+describe('AtomXtermOverwriteProfileElement', () => {
+    this.model;
+
+    beforeEach(() => {
+        this.model = jasmine.createSpyObj('model', ['setElement']);
+    });
+
+    it('initialize()', () => {
+        let element = new AtomXtermOverwriteProfileElement;
+        element.initialize(this.model);
+        expect(element.promptButtonsDiv.childElementCount).toBe(0);
+    });
+
+    it('setNewPrompt()', () => {
+        let element = new AtomXtermOverwriteProfileElement;
+        element.initialize(this.model);
+        let profileName = 'foo';
+        let confirmHandler = () => {};
+        let cancelHandler = () => {};
+        element.setNewPrompt(profileName, confirmHandler, cancelHandler);
+        expect(element.messageDiv.textContent).toBe('Overwrite existing profile \'foo\'?');
+    });
 });

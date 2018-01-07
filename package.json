@@ -1,8 +1,8 @@
 {
   "name": "atom-xterm",
   "main": "./lib/atom-xterm",
-  "version": "1.0.21",
-  "description": "Atom plugin for providing terminal emulators inside of the editor as tabs.",
+  "version": "3.2.3",
+  "description": "Atom plugin for providing terminals inside your Atom workspace.",
   "keywords": [
     "terminal",
     "xterm",
@@ -29,19 +29,20 @@
   "repository": "https://github.com/amejia1/atom-xterm",
   "license": "MIT",
   "engines": {
-    "atom": ">=1.19.0 <2.0.0"
+    "atom": ">=1.23.1 <2.0.0"
   },
   "dependencies": {
     "element-resize-detector": "^1.1.12",
-    "node-pty": "^0.7.0",
+    "fs-extra": "^5.0.0",
+    "node-pty": "^0.7.4",
     "uuid": "^3.1.0",
-    "whatwg-url": "^6.1.0",
-    "xterm": "git+https://github.com/sourcelair/xterm.js.git#v3"
+    "whatwg-url": "^6.4.0",
+    "xterm": "^3.0.1"
   },
   "devDependencies": {
-    "atom-jasmine2-test-runner": "^1.1.2",
+    "atom-jasmine2-test-runner": "^1.2.0",
     "jasmine-spec-reporter": "^4.2.1",
-    "tmp": "^0.0.33"
+    "tmp": "0.0.33"
   },
   "scripts": {
     "move-winpty-binaries": "node scripts/move-winpty-binaries.js",
@@ -49,5 +50,8 @@
     "preinstall": "npm run move-winpty-binaries",
     "postinstall": "npm run build-xterm-v3",
     "preuninstall": "npm run move-winpty-binaries"
+  },
+  "deserializers": {
+    "AtomXtermModel": "deserializeAtomXtermModel"
   }
 }
