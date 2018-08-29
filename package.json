@@ -67,7 +67,7 @@
     "jsonlint-cli": "^1.0.1",
     "mini-css-extract-plugin": "^0.4.1",
     "node-sass": "^4.9.3",
-    "optimize-css-assets-webpack-plugin": "^5.0.0",
+    "optimize-css-assets-webpack-plugin": "5.0.0",
     "postcss-loader": "^3.0.0",
     "prunk": "^1.3.1",
     "sass-loader": "^7.1.0",
