@@ -45,7 +45,7 @@ class AtomXtermModel {
     this.profilesSingleton = AtomXtermProfilesSingleton.instance
     this.profile = this.profilesSingleton.createProfileDataFromUri(this.uri)
     this.terminals_set = this.options.terminals_set
-    this.element = null
+    this.component = null
     this.pane = null
     this.title = DEFAULT_TITLE
     if (this.profile.title !== null) {
@@ -114,6 +114,14 @@ class AtomXtermModel {
     })
   }
 
+  getComponent () {
+    return this.component
+  }
+
+  setComponent (component) {
+    this.component = component
+  }
+
   serialize () {
     return {
       deserializer: 'AtomXtermModel',
@@ -123,18 +131,14 @@ class AtomXtermModel {
   }
 
   destroy () {
-    if (this.element) {
-      this.element.destroy()
+    if (this.component) {
+      this.component.destroy()
     }
     this.terminals_set.delete(this)
   }
 
   getTitle () {
     return this.title
-  }
-
-  getElement () {
-    return this.element
   }
 
   getURI () {
@@ -197,15 +201,8 @@ class AtomXtermModel {
     return url.searchParams.toString()
   }
 
-  refitTerminal () {
-    // Only refit if there's a DOM element attached to the model.
-    if (this.element) {
-      this.element.refitTerminal()
-    }
-  }
-
   focusOnTerminal () {
-    this.element.focusOnTerminal()
+    this.component.focusOnTerminal()
     let oldIsModified = this.modified
     this.modified = false
     if (oldIsModified !== this.modified) {
@@ -218,17 +215,17 @@ class AtomXtermModel {
   }
 
   restartPtyProcess () {
-    if (this.element) {
-      this.element.restartPtyProcess()
+    if (this.component) {
+      this.component.restartPtyProcess()
     }
   }
 
   copyFromTerminal () {
-    return this.element.terminal.getSelection()
+    return this.component.copyFromTerminal()
   }
 
   pasteToTerminal (text) {
-    this.element.ptyProcess.write(text)
+    this.component.pasteToTerminal(text)
   }
 
   setNewPane (pane) {
@@ -236,15 +233,15 @@ class AtomXtermModel {
   }
 
   openHoveredLink () {
-    this.element.openHoveredLink()
+    this.component.openHoveredLink()
   }
 
   getHoveredLink () {
-    return this.element.getHoveredLink()
+    return this.component.getHoveredLink()
   }
 
   toggleProfileMenu () {
-    this.element.toggleProfileMenu()
+    this.component.toggleProfileMenu()
   }
 
   /* Public methods are defined below this line. */
@@ -268,7 +265,7 @@ class AtomXtermModel {
   applyProfileChanges (profileChanges) {
     profileChanges = this.profilesSingleton.sanitizeData(profileChanges)
     this.profile = this.profilesSingleton.deepClone(Object.assign(this.profile, profileChanges))
-    this.element.queueNewProfileChanges(profileChanges)
+    this.component.queueNewProfileChanges(profileChanges)
   }
 }
 

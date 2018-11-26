@@ -24,10 +24,10 @@ import { AtomXtermOverwriteProfileModel } from './atom-xterm-overwrite-profile-m
 import { currentItemIsAtomXtermModel } from './atom-xterm-model'
 
 class AtomXtermSaveProfileModel {
-  constructor (atomXtermProfileMenuElement) {
-    this.atomXtermProfileMenuElement = atomXtermProfileMenuElement
+  constructor (atomXtermProfileMenuComponent) {
+    this.atomXtermProfileMenuComponent = atomXtermProfileMenuComponent
     this.profilesSingleton = AtomXtermProfilesSingleton.instance
-    this.element = null
+    this.component = null
     this.panel = atom.workspace.addModalPanel({
       item: this,
       visible: false
@@ -40,11 +40,7 @@ class AtomXtermSaveProfileModel {
   }
 
   getElement () {
-    return this.element
-  }
-
-  setElement (element) {
-    this.element = element
+    return this.component.element.current
   }
 
   getTextbox () {
@@ -56,7 +52,7 @@ class AtomXtermSaveProfileModel {
       this.profilesSingleton.reloadProfiles()
       this.profilesSingleton.profilesLoadPromise.then(() => {
         this.close()
-        this.atomXtermProfileMenuElement.applyProfileChanges(profileChanges)
+        this.atomXtermProfileMenuComponent.applyProfileChanges(profileChanges)
       })
     })
   }
@@ -77,14 +73,14 @@ class AtomXtermSaveProfileModel {
     })
   }
 
-  close (focusMenuElement = true) {
+  close (focusMenuComponent = true) {
     if (!this.panel.isVisible()) {
       return
     }
     this.textbox.setText('')
     this.panel.hide()
-    if (this.atomXtermProfileMenuElement.isVisible() && focusMenuElement) {
-      this.atomXtermProfileMenuElement.focus()
+    if (this.atomXtermProfileMenuComponent.isVisible() && focusMenuComponent) {
+      this.atomXtermProfileMenuComponent.focus()
     }
   }
 

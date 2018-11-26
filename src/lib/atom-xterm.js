@@ -23,19 +23,20 @@ import '../styles/atom-xterm.sass'
 import { CompositeDisposable } from 'atom'
 
 import atomXtermConfig from './atom-xterm-config'
-import { AtomXtermElement } from './atom-xterm-element'
+import { AtomXtermComponent } from './atom-xterm-component'
 import { AtomXtermModel, isAtomXtermModel } from './atom-xterm-model'
 import { ATOM_XTERM_BASE_URI, AtomXtermProfilesSingleton } from './atom-xterm-profiles'
-import { AtomXtermProfileMenuElement } from './atom-xterm-profile-menu-element'
-import { AtomXtermProfileMenuModel } from './atom-xterm-profile-menu-model'
-import { AtomXtermDeleteProfileElement } from './atom-xterm-delete-profile-element'
+import { AtomXtermProfileMenuComponent } from './atom-xterm-profile-menu-component'
+import { AtomXtermDeleteProfileComponent } from './atom-xterm-delete-profile-component'
 import { AtomXtermDeleteProfileModel } from './atom-xterm-delete-profile-model'
-import { AtomXtermOverwriteProfileElement } from './atom-xterm-overwrite-profile-element'
+import { AtomXtermOverwriteProfileComponent } from './atom-xterm-overwrite-profile-component'
 import { AtomXtermOverwriteProfileModel } from './atom-xterm-overwrite-profile-model'
-import { AtomXtermSaveProfileElement } from './atom-xterm-save-profile-element'
+import { AtomXtermSaveProfileComponent } from './atom-xterm-save-profile-component'
 import { AtomXtermSaveProfileModel } from './atom-xterm-save-profile-model'
 
 import { URL } from 'whatwg-url'
+import React from 'react'
+import ReactDOM from 'react-dom'
 
 const AtomXtermSingletonSymbol = Symbol('AtomXtermSingleton sentinel')
 
@@ -51,6 +52,13 @@ class AtomXtermSingleton {
       this[AtomXtermSingletonSymbol] = new AtomXtermSingleton(AtomXtermSingletonSymbol)
     }
     return this[AtomXtermSingletonSymbol]
+  }
+
+  renderView (component) {
+    const view = document.createElement('div')
+    view.classList.add('atom-xterm-component-root')
+    ReactDOM.render(component, view)
+    return view
   }
 
   activate (state) {
@@ -93,33 +101,18 @@ class AtomXtermSingleton {
 
     // Register view provider for terminal emulator item.
     this.disposables.add(atom.views.addViewProvider(AtomXtermModel, (atomXtermModel) => {
-      let atomXtermElement = new AtomXtermElement()
-      atomXtermElement.initialize(atomXtermModel)
-      return atomXtermElement
-    }))
-
-    // Register view provider for terminal emulator profile menu item.
-    this.disposables.add(atom.views.addViewProvider(AtomXtermProfileMenuModel, (atomXtermProfileMenuModel) => {
-      let atomXtermProfileMenuElement = new AtomXtermProfileMenuElement()
-      atomXtermProfileMenuElement.initialize(atomXtermProfileMenuModel)
-      return atomXtermProfileMenuElement
+      return this.renderView(<AtomXtermComponent atomXtermModel={atomXtermModel} />)
     }))
 
     // Register view profile for modal items.
     this.disposables.add(atom.views.addViewProvider(AtomXtermDeleteProfileModel, (atomXtermDeleteProfileModel) => {
-      let atomXtermDeleteProfileElement = new AtomXtermDeleteProfileElement()
-      atomXtermDeleteProfileElement.initialize(atomXtermDeleteProfileModel)
-      return atomXtermDeleteProfileElement
+      return this.renderView(<AtomXtermDeleteProfileComponent model={atomXtermDeleteProfileModel} />)
     }))
     this.disposables.add(atom.views.addViewProvider(AtomXtermOverwriteProfileModel, (atomXtermOverwriteProfileModel) => {
-      let atomXtermOverwriteProfileElement = new AtomXtermOverwriteProfileElement()
-      atomXtermOverwriteProfileElement.initialize(atomXtermOverwriteProfileModel)
-      return atomXtermOverwriteProfileElement
+      return this.renderView(<AtomXtermOverwriteProfileComponent model={atomXtermOverwriteProfileModel} />)
     }))
     this.disposables.add(atom.views.addViewProvider(AtomXtermSaveProfileModel, (atomXtermSaveProfileModel) => {
-      let atomXtermSaveProfileElement = new AtomXtermSaveProfileElement()
-      atomXtermSaveProfileElement.initialize(atomXtermSaveProfileModel)
-      return atomXtermSaveProfileElement
+      return this.renderView(<AtomXtermSaveProfileComponent model={atomXtermSaveProfileModel} />)
     }))
 
     // Add opener for terminal emulator item.
@@ -200,7 +193,7 @@ class AtomXtermSingleton {
          */
       }
     }))
-    this.disposables.add(atom.commands.add('atom-xterm', {
+    this.disposables.add(atom.commands.add('.atom-xterm', {
       'atom-xterm:close': () => this.close(),
       'atom-xterm:restart': () => this.restart(),
       'atom-xterm:copy': () => this.copy(),
@@ -216,6 +209,7 @@ class AtomXtermSingleton {
   }
 
   deserializeAtomXtermModel (serializedModel, atomEnvironment) {
+    return
     let pack = atom.packages.enablePackage('atom-xterm')
     pack.preload()
     pack.activateNow()

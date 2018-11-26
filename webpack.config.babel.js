@@ -7,7 +7,7 @@ import OptimizeCssAssetsPlugin from 'optimize-css-assets-webpack-plugin'
 
 import packageJson from './package.json'
 
-const NODE_ENV = process.env.NODE_ENV || 'production'
+const NODE_ENV = process.env.NODE_ENV || 'development'
 
 function getConfig (entryName) {
   let entry = null

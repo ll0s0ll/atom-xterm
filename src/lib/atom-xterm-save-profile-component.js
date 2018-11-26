@@ -17,31 +17,29 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import { clearDiv } from './atom-xterm-utils'
+import React from 'react'
 
-class AtomXtermSaveProfileElementImpl extends HTMLElement {
-  initialize (model) {
-    this.model = model
-    this.model.setElement(this)
-    this.textboxDiv = document.createElement('div')
-    this.textboxDiv.classList.add('atom-xterm-save-profile-textbox')
-    this.appendChild(this.textboxDiv)
-    this.messageDiv = document.createElement('div')
-    this.messageDiv.classList.add('atom-xterm-modal-message')
-    this.messageDiv.appendChild(document.createTextNode('Enter new profile name'))
-    this.appendChild(this.messageDiv)
+class AtomXtermSaveProfileComponent extends React.Component {
+  constructor (props) {
+    super(props)
+    this.props.model.component = this
+    this.element = React.createRef()
   }
 
-  setNewTextbox (textbox) {
-    clearDiv(this.textboxDiv)
-    this.textboxDiv.appendChild(textbox.getElement())
+  render () {
+    return (
+      <div ref={this.element}>
+        <div className='atom-xterm-save-profile-textbox'>
+          {this.props.textbox.getElement()}
+        </div>
+        <div className='atom-xterm-modal-message'>
+          {'Enter new profile name'}
+        </div>
+      </div>
+    )
   }
 }
 
-const AtomXtermSaveProfileElement = document.registerElement('atom-xterm-save-profile', {
-  prototype: AtomXtermSaveProfileElementImpl.prototype
-})
-
 export {
-  AtomXtermSaveProfileElement
+  AtomXtermSaveProfileComponent
 }

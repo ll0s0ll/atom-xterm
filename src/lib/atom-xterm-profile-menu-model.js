@@ -20,12 +20,12 @@
 class AtomXtermProfileMenuModel {
   constructor (atomXtermModel) {
     this.atomXtermModel = atomXtermModel
-    this.element = null
+    this.component = null
   }
 
   destroy () {
-    if (this.element) {
-      this.element.destroy()
+    if (this.component) {
+      this.component.destroy()
     }
   }
 
@@ -34,11 +34,10 @@ class AtomXtermProfileMenuModel {
   }
 
   getElement () {
-    return this.element
-  }
-
-  setElement (element) {
-    this.element = element
+    if (!this.component) {
+      return null
+    }
+    return this.component.element.current
   }
 
   getAtomXtermModelElement () {

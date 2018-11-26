@@ -25,13 +25,14 @@ import urlRegex from 'url-regex'
 import { shell } from 'electron'
 
 import atomXtermConfig from './atom-xterm-config'
-import { AtomXtermProfileMenuElement } from './atom-xterm-profile-menu-element'
+import { AtomXtermProfileMenuComponent } from './atom-xterm-profile-menu-component'
 import { AtomXtermProfileMenuModel } from './atom-xterm-profile-menu-model'
 import { AtomXtermProfilesSingleton } from './atom-xterm-profiles'
 
 import fs from 'fs-extra'
 
 import elementResizeDetectorMaker from 'element-resize-detector'
+import React from 'react'
 
 Terminal.applyAddon(fit)
 
@@ -53,95 +54,142 @@ const ATOM_XTERM_OPTIONS = [
   'promptToStartup'
 ]
 
-class AtomXtermElementImpl extends HTMLElement {
-  initialize (model) {
+class AtomXtermTopComponent extends React.Component {
+  constructor (props) {
+    super(props)
+    this.state = {
+      isHidden: true
+    }
+    this.restartButtonClickHandler = this.restartButtonClickHandler.bind(this)
+  }
+
+  showNotification (message, infoType, restartButtonText = 'Restart') {
+    if (infoType === 'success') {
+      atom.notifications.addSuccess(message)
+    } else if (infoType === 'error') {
+      atom.notifications.addError(message)
+    } else if (infoType === 'warning') {
+      atom.notifications.addWarning(message)
+    } else if (infoType === 'info') {
+      atom.notifications.addInfo(message)
+    } else {
+      throw new Error(`Unknown info type: ${infoType}`)
+    }
+    this.setState(() => {
+      return {
+        isHidden: false,
+        message: message,
+        infoType: infoType,
+        restartButtonText: restartButtonText
+      }
+    })
+  }
+
+  hideNotification () {
+    this.setState(() => {
+      return {
+        isHidden: true
+      }
+    })
+  }
+
+  restartButtonClickHandler () {
+    this.hideNotification()
+    this.props.getAtomXtermComponent().restartPtyProcess()
+  }
+
+  render () {
+    if (this.state.isHidden) {
+      return null
+    }
+    let restartButtonClasses = `btn btn-${this.state.infoType} atom-xterm-restart-btn`
+    let messageClasses = `atom-xterm-notice-${this.state.infoType}`
+    return (
+      <div className='atom-xterm-top-div'>
+        <div className={messageClasses}>
+          {this.state.message}
+          <button className={restartButtonClasses} onClick={this.restartButtonClickHandler}>
+            {this.state.restartButtonText}
+          </button>
+        </div>
+      </div>
+    )
+  }
+}
+
+class AtomXtermTerminalComponent extends React.Component {
+  // NOTE: This React component should not have anything that will trigger a
+  // re-render.
+  constructor (props) {
+    super(props)
+    this.terminalComponentRef = React.createRef()
     this.profilesSingleton = AtomXtermProfilesSingleton.instance
-    this.model = model
-    this.model.element = this
     this.disposables = new CompositeDisposable()
-    this.topDiv = document.createElement('div')
-    this.topDiv.classList.add('atom-xterm-top-div')
-    this.appendChild(this.topDiv)
-    this.mainDiv = document.createElement('div')
-    this.mainDiv.classList.add('atom-xterm-main-div')
-    this.appendChild(this.mainDiv)
-    this.menuDiv = document.createElement('div')
-    this.menuDiv.classList.add('atom-xterm-menu-div')
-    this.mainDiv.appendChild(this.menuDiv)
-    this.terminalDiv = document.createElement('div')
-    this.terminalDiv.classList.add('atom-xterm-term-container')
-    this.mainDiv.appendChild(this.terminalDiv)
-    this.atomXtermProfileMenuElement = new AtomXtermProfileMenuElement()
     this.hoveredLink = null
     this.pendingTerminalProfileOptions = {}
     this.terminalDivIntersectionRatio = 0.0
-    this.isInitialized = false
-    this.initializedPromise = new Promise((resolve, reject) => {
-      // Always wait for the model to finish initializing before proceeding.
-      this.model.initializedPromise.then((atomXtermModel) => {
-        this.setAttribute('session-id', this.model.getSessionId())
-        this.atomXtermProfileMenuElement.initialize(new AtomXtermProfileMenuModel(this.model)).then(() => {
-          this.menuDiv.append(this.atomXtermProfileMenuElement)
-          this.createTerminal().then(() => {
-            // An element resize detector is used to check when this element is
-            // resized due to the pane resizing or due to the entire window
-            // resizing.
-            this.erd = elementResizeDetectorMaker({
-              strategy: 'scroll'
-            })
-            this.erd.listenTo(this.mainDiv, (element) => {
-              this.refitTerminal()
-            })
-            // Add an IntersectionObserver in order to apply new options and
-            // refit as soon as the terminal is visible.
-            this.terminalDivIntersectionObserver = new IntersectionObserver((entries, observer) => {
-              // NOTE: Only the terminal div should be observed therefore there
-              // should only be one entry.
-              let entry = entries[0]
-              this.terminalDivIntersectionRatio = entry.intersectionRatio
-              this.applyPendingTerminalProfileOptions()
-            }, {
-              root: this,
-              threshold: 1.0
-            })
-            this.terminalDivIntersectionObserver.observe(this.terminalDiv)
-            // Add event handler for increasing/decreasing the font when
-            // holding 'ctrl' and moving the mouse wheel up or down.
-            this.terminalDiv.addEventListener(
-              'wheel',
-              (wheelEvent) => {
-                if (wheelEvent.ctrlKey && atom.config.get('editor.zoomFontWhenCtrlScrolling')) {
-                  if (wheelEvent.deltaY < 0) {
-                    let fontSize = this.model.profile.fontSize + 1
-                    if (fontSize > atomXtermConfig.getMaximumFontSize()) {
-                      fontSize = atomXtermConfig.getMaximumFontSize()
-                    }
-                    this.model.applyProfileChanges({fontSize: fontSize})
-                    wheelEvent.stopPropagation()
-                  } else if (wheelEvent.deltaY > 0) {
-                    let fontSize = this.model.profile.fontSize - 1
-                    if (fontSize < atomXtermConfig.getMinimumFontSize()) {
-                      fontSize = atomXtermConfig.getMinimumFontSize()
-                    }
-                    this.model.applyProfileChanges({fontSize: fontSize})
-                    wheelEvent.stopPropagation()
-                  }
-                }
-              },
-              {capture: true}
-            )
-            resolve()
-          })
+    // NOTE: The terminal container is created and maintained through the DOM.
+    this.terminalDiv = document.createElement('div')
+    this.terminalDiv.classList.add('atom-xterm-terminal-container')
+    this.terminalDiv.style.backgroundColor = '#000'
+  }
+
+  render () {
+    return (
+      <div
+        ref={this.terminalComponentRef}
+        className='atom-xterm-terminal-component'
+      />
+    )
+  }
+
+  componentDidMount () {
+    this.terminalComponentRef.current.appendChild(this.terminalDiv)
+    this.props.atomXtermModel.initializedPromise.then(() => {
+      this.createTerminal().then(() => {
+        // Add an IntersectionObserver in order to apply new options and
+        // refit as soon as the terminal is visible.
+        this.terminalDivIntersectionObserver = new IntersectionObserver((entries, observer) => {
+          // NOTE: Only the terminal div should be observed therefore there
+          // should only be one entry.
+          let entry = entries[0]
+          this.terminalDivIntersectionRatio = entry.intersectionRatio
+          this.applyPendingTerminalProfileOptions()
+        }, {
+          root: this.terminalComponentRef.current,
+          threshold: 1.0
         })
-      }).then(() => {
-        this.isInitialized = true
+        this.terminalDivIntersectionObserver.observe(this.terminalDiv)
+        // Add event handler for increasing/decreasing the font when
+        // holding 'ctrl' and moving the mouse wheel up or down.
+        this.terminalDiv.addEventListener(
+          'wheel',
+          (wheelEvent) => {
+            if (wheelEvent.ctrlKey && atom.config.get('editor.zoomFontWhenCtrlScrolling')) {
+              if (wheelEvent.deltaY < 0) {
+                let fontSize = this.props.atomXtermModel.profile.fontSize + 1
+                if (fontSize > atomXtermConfig.getMaximumFontSize()) {
+                  fontSize = atomXtermConfig.getMaximumFontSize()
+                }
+                this.props.atomXtermModel.applyProfileChanges({fontSize: fontSize})
+                wheelEvent.stopPropagation()
+              } else if (wheelEvent.deltaY > 0) {
+                let fontSize = this.props.atomXtermModel.profile.fontSize - 1
+                if (fontSize < atomXtermConfig.getMinimumFontSize()) {
+                  fontSize = atomXtermConfig.getMinimumFontSize()
+                }
+                this.props.atomXtermModel.applyProfileChanges({fontSize: fontSize})
+                wheelEvent.stopPropagation()
+              }
+            }
+          },
+          {capture: true}
+        )
       })
     })
-    return this.initializedPromise
   }
 
   destroy () {
-    this.atomXtermProfileMenuElement.destroy()
     if (this.ptyProcess) {
       this.ptyProcess.kill()
     }
@@ -152,11 +200,11 @@ class AtomXtermElementImpl extends HTMLElement {
   }
 
   getShellCommand () {
-    return this.model.profile.command
+    return this.props.atomXtermModel.profile.command
   }
 
   getArgs () {
-    let args = this.model.profile.args
+    let args = this.props.atomXtermModel.profile.args
     if (!Array.isArray(args)) {
       throw new Error('Arguments set are not an array.')
     }
@@ -164,7 +212,7 @@ class AtomXtermElementImpl extends HTMLElement {
   }
 
   getTermType () {
-    return this.model.profile.name
+    return this.props.atomXtermModel.profile.name
   }
 
   checkPathIsDirectory (path) {
@@ -187,22 +235,22 @@ class AtomXtermElementImpl extends HTMLElement {
 
   getCwd () {
     return new Promise((resolve, reject) => {
-      let cwd = this.model.profile.cwd
+      let cwd = this.props.atomXtermModel.profile.cwd
       this.checkPathIsDirectory(cwd).then((isDirectory) => {
         if (isDirectory) {
           resolve(cwd)
         } else {
-          cwd = this.model.getPath()
+          cwd = this.props.atomXtermModel.getPath()
           this.checkPathIsDirectory(cwd).then((isDirectory) => {
             if (isDirectory) {
               resolve(cwd)
             } else {
               // If the cwd from the model was invalid, reset it to null.
-              this.model.cwd = null
+              this.props.atomXtermModel.cwd = null
               cwd = this.profilesSingleton.getBaseProfile.cwd
               this.checkPathIsDirectory(cwd).then((isDirectory) => {
                 if (isDirectory) {
-                  this.model.cwd = cwd
+                  this.props.atomXtermModel.profile.cwd = cwd
                   resolve(cwd)
                 }
                 resolve(null)
@@ -215,15 +263,15 @@ class AtomXtermElementImpl extends HTMLElement {
   }
 
   getEnv () {
-    let env = this.model.profile.env
+    let env = this.props.atomXtermModel.profile.env
     if (!env) {
       env = Object.assign({}, process.env)
     }
     if (typeof env !== 'object' || Array.isArray(env)) {
       throw new Error('Environment set is not an object.')
     }
-    let setEnv = this.model.profile.setEnv
-    let deleteEnv = this.model.profile.deleteEnv
+    let setEnv = this.props.atomXtermModel.profile.setEnv
+    let deleteEnv = this.props.atomXtermModel.profile.deleteEnv
     for (let key in setEnv) {
       env[key] = setEnv[key]
     }
@@ -234,15 +282,15 @@ class AtomXtermElementImpl extends HTMLElement {
   }
 
   getEncoding () {
-    return this.model.profile.encoding
+    return this.props.atomXtermModel.profile.encoding
   }
 
   leaveOpenAfterExit () {
-    return this.model.profile.leaveOpenAfterExit
+    return this.props.atomXtermModel.profile.leaveOpenAfterExit
   }
 
   isPromptToStartup () {
-    return this.model.profile.promptToStartup
+    return this.props.atomXtermModel.profile.promptToStartup
   }
 
   isPtyProcessRunning () {
@@ -254,8 +302,8 @@ class AtomXtermElementImpl extends HTMLElement {
       cursorBlink: true,
       experimentalCharAtlas: 'dynamic'
     }
-    xtermOptions = Object.assign(xtermOptions, this.model.profile.xtermOptions)
-    xtermOptions.fontSize = this.model.profile.fontSize
+    xtermOptions = Object.assign(xtermOptions, this.props.atomXtermModel.profile.xtermOptions)
+    xtermOptions.fontSize = this.props.atomXtermModel.profile.fontSize
     // NOTE: The cloning is needed because the Terminal class modifies the
     // options passed to it.
     return this.profilesSingleton.deepClone(xtermOptions)
@@ -264,9 +312,7 @@ class AtomXtermElementImpl extends HTMLElement {
   setMainBackgroundColor () {
     let xtermOptions = this.getXtermOptions()
     if (xtermOptions.theme && xtermOptions.theme.background) {
-      this.style.backgroundColor = xtermOptions.theme.background
-    } else {
-      this.style.backgroundColor = '#000'
+      this.terminalDiv.style.backgroundColor = xtermOptions.theme.background
     }
   }
 
@@ -303,7 +349,7 @@ class AtomXtermElementImpl extends HTMLElement {
     )
     this.disposables.add(this.profilesSingleton.onDidResetBaseProfile((baseProfile) => {
       let profileChanges = this.profilesSingleton.diffProfiles(
-        this.model.getProfile(),
+        this.props.atomXtermModel.getProfile(),
         {
           // Only allow changes to settings related to the terminal front end
           // to be applied to existing terminals.
@@ -311,7 +357,7 @@ class AtomXtermElementImpl extends HTMLElement {
           xtermOptions: baseProfile.xtermOptions
         }
       )
-      this.model.applyProfileChanges(profileChanges)
+      this.props.atomXtermModel.applyProfileChanges(profileChanges)
     }))
     if (this.isPromptToStartup()) {
       return this.promptToStartup()
@@ -320,42 +366,22 @@ class AtomXtermElementImpl extends HTMLElement {
   }
 
   showNotification (message, infoType, restartButtonText = 'Restart') {
-    let messageDiv = document.createElement('div')
-    let restartButton = document.createElement('button')
-    restartButton.classList.add('btn')
-    restartButton.appendChild(document.createTextNode(restartButtonText))
-    restartButton.addEventListener('click', (event) => {
-      this.restartPtyProcess()
-    })
-    restartButton.classList.add('btn-' + infoType)
-    restartButton.classList.add('atom-xterm-restart-btn')
-    messageDiv.classList.add('atom-xterm-notice-' + infoType)
-    messageDiv.appendChild(document.createTextNode(message))
-    messageDiv.appendChild(restartButton)
-    this.topDiv.innerHTML = ''
-    this.topDiv.appendChild(messageDiv)
-    if (infoType === 'success') {
-      atom.notifications.addSuccess(message)
-    } else if (infoType === 'error') {
-      atom.notifications.addError(message)
-    } else if (infoType === 'warning') {
-      atom.notifications.addWarning(message)
-    } else if (infoType === 'info') {
-      atom.notifications.addInfo(message)
-    } else {
-      throw new Error('Unknown info type: ' + infoType)
-    }
+    this.props.getAtomXtermComponent().showNotification(
+      message,
+      infoType,
+      restartButtonText
+    )
   }
 
   promptToStartup () {
     return new Promise((resolve, reject) => {
       let message
-      if (this.model.profile.title === null) {
+      if (this.props.atomXtermModel.profile.title === null) {
         let command = [this.getShellCommand()]
         command.push(...this.getArgs())
         message = `New command ${JSON.stringify(command)} ready to start.`
       } else {
-        message = `New command for profile ${this.model.profile.title} ready to start.`
+        message = `New command for profile ${this.props.atomXtermModel.profile.title} ready to start.`
       }
       this.showNotification(
         message,
@@ -374,7 +400,6 @@ class AtomXtermElementImpl extends HTMLElement {
           this.ptyProcess.kill()
         }
         // Reset the terminal.
-        this.atomXtermProfileMenuElement.hideProfileMenu()
         this.terminal.reset()
 
         // Setup pty process.
@@ -418,22 +443,22 @@ class AtomXtermElementImpl extends HTMLElement {
         if (this.ptyProcess) {
           this.ptyProcessRunning = true
           this.ptyProcess.on('data', (data) => {
-            let oldTitle = this.model.title
-            if (this.model.profile.title !== null) {
-              this.model.title = this.model.profile.title
+            let oldTitle = this.props.atomXtermModel.title
+            if (this.props.atomXtermModel.profile.title !== null) {
+              this.props.atomXtermModel.title = this.props.atomXtermModel.profile.title
             } else if (process.platform !== 'win32') {
-              this.model.title = this.ptyProcess.process
+              this.props.atomXtermModel.title = this.ptyProcess.process
             }
-            if (oldTitle !== this.model.title) {
-              this.model.emitter.emit('did-change-title', this.model.title)
+            if (oldTitle !== this.props.atomXtermModel.title) {
+              this.props.atomXtermModel.emitter.emit('did-change-title', this.props.atomXtermModel.title)
             }
             this.terminal.write(data)
-            this.model.handleNewDataArrival()
+            this.props.atomXtermModel.handleNewDataArrival()
           })
           this.ptyProcess.on('exit', (code, signal) => {
             this.ptyProcessRunning = false
             if (!this.leaveOpenAfterExit()) {
-              this.model.exit()
+              this.props.atomXtermModel.exit()
             } else {
               if (code === 0) {
                 this.showNotification(
@@ -448,7 +473,6 @@ class AtomXtermElementImpl extends HTMLElement {
               }
             }
           })
-          this.topDiv.innerHTML = ''
           resolve()
         }
       })
@@ -485,7 +509,6 @@ class AtomXtermElementImpl extends HTMLElement {
           delete this.pendingTerminalProfileOptions[key]
         }
       }
-
       this.refitTerminal()
     }
 
@@ -501,6 +524,10 @@ class AtomXtermElementImpl extends HTMLElement {
     if (this.terminalDivIntersectionRatio === 1.0) {
       const geometry = this.terminal.proposeGeometry()
       if (geometry) {
+        if (geometry.rows === Infinity || geometry.cols === Infinity) {
+          console.warn('Proposed geometry included an infinite value, resizing will not be done.')
+          return
+        }
         // Resize terminal
         let newTerminalCols = geometry.cols
         if (process.platform === 'win32' && newTerminalCols < this.terminal.cols) {
@@ -530,13 +557,6 @@ class AtomXtermElementImpl extends HTMLElement {
     if (this.terminal) {
       this.terminal.focus()
     }
-  }
-
-  toggleProfileMenu () {
-    // The profile menu needs to be initialized before it can be toggled.
-    this.atomXtermProfileMenuElement.initializedPromise.then(() => {
-      this.atomXtermProfileMenuElement.toggleProfileMenu()
-    })
   }
 
   hideTerminal () {
@@ -575,10 +595,130 @@ class AtomXtermElementImpl extends HTMLElement {
   }
 }
 
-const AtomXtermElement = document.registerElement('atom-xterm', {
-  prototype: AtomXtermElementImpl.prototype
-})
+class AtomXtermMainComponent extends React.Component {
+  constructor (props) {
+    super(props)
+    this.componentRef = React.createRef()
+    this.terminalComponentRef = React.createRef()
+    this.erd = elementResizeDetectorMaker({
+      strategy: 'scroll'
+    })
+  }
+
+  render () {
+    return (
+      <div
+        ref={this.componentRef}
+        className='atom-xterm-main-div'
+      >
+        <AtomXtermTerminalComponent
+          ref={this.terminalComponentRef}
+          atomXtermModel={this.props.atomXtermModel}
+          getAtomXtermComponent={this.props.getAtomXtermComponent}
+        />
+      </div>
+    )
+  }
+
+  componentDidMount () {
+    this.erd.listenTo(this.componentRef.current, (element) => {
+      this.terminalComponentRef.current.refitTerminal()
+    })
+  }
+}
+
+class AtomXtermComponent extends React.Component {
+  constructor (props) {
+    super(props)
+    this.props.atomXtermModel.setComponent(this)
+    this.state = {
+      sessionId: null
+    }
+    this.topComponentRef = React.createRef()
+    this.mainComponentRef = React.createRef()
+    this.getSelf = this.getSelf.bind(this)
+    // Always wait for the model to finish initializing before proceeding.
+    this.props.atomXtermModel.initializedPromise.then(() => {
+      this.setState((state, props) => {
+        return {
+          sessionId: props.atomXtermModel.getSessionId()
+        }
+      })
+    })
+  }
+
+  render () {
+    return (
+      <div
+        className='atom-xterm'
+        session-id={this.state.sessionId}
+      >
+        <AtomXtermTopComponent
+          ref={this.topComponentRef}
+          getAtomXtermComponent={this.getSelf}
+        />
+        <AtomXtermMainComponent
+          ref={this.mainComponentRef}
+          atomXtermModel={this.props.atomXtermModel}
+          getAtomXtermComponent={this.getSelf}
+        />
+      </div>
+    )
+  }
+
+  getTerminalComponentRef () {
+    return this.mainComponentRef.current.terminalComponentRef
+  }
+
+  destroy () {
+    this.getTerminalComponentRef().current.destroy()
+  }
+
+  getSelf () {
+    return this
+  }
+
+  showNotification (message, infoType, restartButtonText = 'Restart') {
+    this.topComponentRef.current.showNotification(
+      message,
+      infoType,
+      restartButtonText
+    )
+  }
+
+  focusOnTerminal () {
+    this.getTerminalComponentRef().current.focusOnTerminal()
+  }
+
+  restartPtyProcess () {
+    this.getTerminalComponentRef().current.restartPtyProcess()
+  }
+
+  copyFromTerminal () {
+    return this.getTerminalComponentRef().current.terminal.getSelection()
+  }
+
+  pasteToTerminal (text) {
+    this.getTerminalComponentRef().current.ptyProcess.write(text)
+  }
+
+  openHoveredLink () {
+    this.getTerminalComponentRef().current.openHoveredLink()
+  }
+
+  getHoveredLink () {
+    return this.getTerminalComponentRef().current.getHoveredLink()
+  }
+
+  toggleProfileMenu () {
+    console.warn('TODO: AtomXtermComponent toggleProfileMenu()')
+  }
+
+  queueNewProfileChanges (profileChanges) {
+    this.getTerminalComponentRef().current.queueNewProfileChanges(profileChanges)
+  }
+}
 
 export {
-  AtomXtermElement
+  AtomXtermComponent
 }

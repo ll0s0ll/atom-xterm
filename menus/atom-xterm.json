@@ -1,6 +1,6 @@
 {
   "context-menu": {
-    "atom-xterm": [
+    ".atom-xterm": [
       {
         "label": "Open New Terminal",
         "command": "atom-xterm:open"
@@ -68,7 +68,7 @@
         "command": "atom-xterm:close-all"
       }
     ],
-    "atom-xterm .atom-xterm-term-container-has-link": [
+    ".atom-xterm .atom-xterm-term-container-has-link": [
       {
         "label": "Open Link",
         "command": "atom-xterm:open-link"
