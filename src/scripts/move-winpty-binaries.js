@@ -17,6 +17,8 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+import 'source-map-support/register'
+
 import fs from 'fs-extra'
 import os from 'os'
 import path from 'path'
@@ -121,6 +123,4 @@ export {
   main
 }
 
-if (require.main === module) {
-  main()
-}
+main()

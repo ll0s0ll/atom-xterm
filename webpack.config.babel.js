@@ -13,7 +13,7 @@ function getConfig (entryName) {
   let entry = null
   let pathValue = null
   let output = null
-  let devtool = 'source-map'
+  let devtool = 'inline-source-map'
   let target = 'node'
   let plugins = [
     new webpack.EnvironmentPlugin({
@@ -50,7 +50,7 @@ function getConfig (entryName) {
         assetNameRegExp: /\.css$/g,
         cssProcessorOptions: {
           map: {
-            inline: false
+            inline: true
           }
         }
       })
@@ -68,7 +68,6 @@ function getConfig (entryName) {
       path: pathValue,
       filename: '[name].js'
     }
-    devtool = false
     plugins.push(
       new CleanWebpackPlugin(
         [pathValue]
