@@ -137,6 +137,7 @@ class AtomXtermTerminalComponent extends React.Component {
     }
     this.onWheelCapture = this.onWheelCapture.bind(this)
     this.onChange = this.onChange.bind(this)
+    this.onResize = this.onResize.bind(this)
   }
 
   render () {
@@ -150,6 +151,11 @@ class AtomXtermTerminalComponent extends React.Component {
           ref={this.terminalContainerRef}
           className={this.state.className}
           style={{backgroundColor: this.state.backgroundColor}}
+        />
+        <ReactResizeDetector
+          handleWidth
+          handleHeight
+          onResize={this.onResize}
         />
       </InView>
     )
@@ -206,6 +212,10 @@ class AtomXtermTerminalComponent extends React.Component {
         inView: inView
       }
     })
+  }
+
+  onResize () {
+    this.refitTerminal()
   }
 
   getShellCommand () {
@@ -617,7 +627,6 @@ class AtomXtermMainComponent extends React.Component {
   constructor (props) {
     super(props)
     this.terminalComponentRef = React.createRef()
-    this.onResize = this.onResize.bind(this)
   }
 
   render () {
@@ -630,17 +639,8 @@ class AtomXtermMainComponent extends React.Component {
           atomXtermModel={this.props.atomXtermModel}
           getAtomXtermComponent={this.props.getAtomXtermComponent}
         />
-        <ReactResizeDetector
-          handleWidth
-          handleHeight
-          onResize={this.onResize}
-        />
       </div>
     )
-  }
-
-  onResize () {
-    this.terminalComponentRef.current.refitTerminal()
   }
 }
 
