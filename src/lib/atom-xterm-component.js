@@ -23,6 +23,8 @@ import { Terminal } from 'xterm'
 import * as fit from 'xterm/lib/addons/fit/fit'
 import urlRegex from 'url-regex'
 import { shell } from 'electron'
+import ReactResizeDetector from 'react-resize-detector'
+import { InView } from 'react-intersection-observer'
 
 import atomXtermConfig from './atom-xterm-config'
 import { AtomXtermProfileMenuComponent } from './atom-xterm-profile-menu-component'
@@ -31,7 +33,6 @@ import { AtomXtermProfilesSingleton } from './atom-xterm-profiles'
 
 import fs from 'fs-extra'
 
-import elementResizeDetectorMaker from 'element-resize-detector'
 import React from 'react'
 
 Terminal.applyAddon(fit)
@@ -122,66 +123,46 @@ class AtomXtermTerminalComponent extends React.Component {
   // re-render.
   constructor (props) {
     super(props)
-    this.terminalComponentRef = React.createRef()
+    this.terminalContainerRef = React.createRef()
     this.profilesSingleton = AtomXtermProfilesSingleton.instance
     this.disposables = new CompositeDisposable()
-    this.hoveredLink = null
     this.pendingTerminalProfileOptions = {}
-    this.terminalDivIntersectionRatio = 0.0
-    // NOTE: The terminal container is created and maintained through the DOM.
-    this.terminalDiv = document.createElement('div')
-    this.terminalDiv.classList.add('atom-xterm-terminal-container')
-    this.terminalDiv.style.backgroundColor = '#000'
+    this.terminal = null
+    this.terminalMounted = false
+    this.state = {
+      hoveredLink: null,
+      backgroundColor: '#000',
+      className: 'atom-xterm-terminal-container',
+      inView: false
+    }
+    this.onWheelCapture = this.onWheelCapture.bind(this)
+    this.onChange = this.onChange.bind(this)
   }
 
   render () {
     return (
-      <div
-        ref={this.terminalComponentRef}
+      <InView
         className='atom-xterm-terminal-component'
-      />
+        onChange={this.onChange}
+        threshold={1.0}
+      >
+        <div
+          ref={this.terminalContainerRef}
+          className={this.state.className}
+          style={{backgroundColor: this.state.backgroundColor}}
+        />
+      </InView>
     )
   }
 
   componentDidMount () {
-    this.terminalComponentRef.current.appendChild(this.terminalDiv)
     this.props.atomXtermModel.initializedPromise.then(() => {
       this.createTerminal().then(() => {
-        // Add an IntersectionObserver in order to apply new options and
-        // refit as soon as the terminal is visible.
-        this.terminalDivIntersectionObserver = new IntersectionObserver((entries, observer) => {
-          // NOTE: Only the terminal div should be observed therefore there
-          // should only be one entry.
-          let entry = entries[0]
-          this.terminalDivIntersectionRatio = entry.intersectionRatio
-          this.applyPendingTerminalProfileOptions()
-        }, {
-          root: this.terminalComponentRef.current,
-          threshold: 1.0
-        })
-        this.terminalDivIntersectionObserver.observe(this.terminalDiv)
-        // Add event handler for increasing/decreasing the font when
-        // holding 'ctrl' and moving the mouse wheel up or down.
-        this.terminalDiv.addEventListener(
+        // NOTE: the wheel event listener must be added directly on the terminal container.
+        this.terminalContainerRef.current.addEventListener(
           'wheel',
           (wheelEvent) => {
-            if (wheelEvent.ctrlKey && atom.config.get('editor.zoomFontWhenCtrlScrolling')) {
-              if (wheelEvent.deltaY < 0) {
-                let fontSize = this.props.atomXtermModel.profile.fontSize + 1
-                if (fontSize > atomXtermConfig.getMaximumFontSize()) {
-                  fontSize = atomXtermConfig.getMaximumFontSize()
-                }
-                this.props.atomXtermModel.applyProfileChanges({fontSize: fontSize})
-                wheelEvent.stopPropagation()
-              } else if (wheelEvent.deltaY > 0) {
-                let fontSize = this.props.atomXtermModel.profile.fontSize - 1
-                if (fontSize < atomXtermConfig.getMinimumFontSize()) {
-                  fontSize = atomXtermConfig.getMinimumFontSize()
-                }
-                this.props.atomXtermModel.applyProfileChanges({fontSize: fontSize})
-                wheelEvent.stopPropagation()
-              }
-            }
+            this.onWheelCapture(wheelEvent)
           },
           {capture: true}
         )
@@ -197,6 +178,34 @@ class AtomXtermTerminalComponent extends React.Component {
       this.terminal.destroy()
     }
     this.disposables.dispose()
+  }
+
+  onWheelCapture (wheelEvent) {
+    if (this.terminalMounted && wheelEvent.ctrlKey && atom.config.get('editor.zoomFontWhenCtrlScrolling')) {
+      if (wheelEvent.deltaY < 0) {
+        let fontSize = this.props.atomXtermModel.profile.fontSize + 1
+        if (fontSize > atomXtermConfig.getMaximumFontSize()) {
+          fontSize = atomXtermConfig.getMaximumFontSize()
+        }
+        this.props.atomXtermModel.applyProfileChanges({fontSize: fontSize})
+        wheelEvent.stopPropagation()
+      } else if (wheelEvent.deltaY > 0) {
+        let fontSize = this.props.atomXtermModel.profile.fontSize - 1
+        if (fontSize < atomXtermConfig.getMinimumFontSize()) {
+          fontSize = atomXtermConfig.getMinimumFontSize()
+        }
+        this.props.atomXtermModel.applyProfileChanges({fontSize: fontSize})
+        wheelEvent.stopPropagation()
+      }
+    }
+  }
+
+  onChange (inView) {
+    this.setState(() => {
+      return {
+        inView: inView
+      }
+    })
   }
 
   getShellCommand () {
@@ -312,7 +321,11 @@ class AtomXtermTerminalComponent extends React.Component {
   setMainBackgroundColor () {
     let xtermOptions = this.getXtermOptions()
     if (xtermOptions.theme && xtermOptions.theme.background) {
-      this.terminalDiv.style.backgroundColor = xtermOptions.theme.background
+      this.setState(() => {
+        return {
+          backgroundColor: xtermOptions.theme.background
+        }
+      })
     }
   }
 
@@ -320,7 +333,8 @@ class AtomXtermTerminalComponent extends React.Component {
     // Attach terminal emulator to this element and refit.
     this.setMainBackgroundColor()
     this.terminal = new Terminal(this.getXtermOptions())
-    this.terminal.open(this.terminalDiv)
+    this.terminal.open(this.terminalContainerRef.current)
+    this.terminalMounted = true
     this.ptyProcessCols = 80
     this.ptyProcessRows = 25
     this.refitTerminal()
@@ -482,7 +496,7 @@ class AtomXtermTerminalComponent extends React.Component {
   applyPendingTerminalProfileOptions () {
     // For any changes involving the xterm.js Terminal object, only apply them
     // when the terminal is visible.
-    if (this.terminalDivIntersectionRatio === 1.0) {
+    if (this.state.inView) {
       let xtermOptions = this.pendingTerminalProfileOptions.xtermOptions || {}
       // NOTE: For legacy reasons, the font size is defined from the 'fontSize'
       // key outside of any defined xterm.js Terminal options.
@@ -521,7 +535,7 @@ class AtomXtermTerminalComponent extends React.Component {
 
   refitTerminal () {
     // Only refit the terminal when it is completely visible.
-    if (this.terminalDivIntersectionRatio === 1.0) {
+    if (this.terminal && this.state.inView) {
       const geometry = this.terminal.proposeGeometry()
       if (geometry) {
         if (geometry.rows === Infinity || geometry.cols === Infinity) {
@@ -559,33 +573,37 @@ class AtomXtermTerminalComponent extends React.Component {
     }
   }
 
-  hideTerminal () {
-    this.terminalDiv.style.visibility = 'hidden'
-  }
-
-  showTerminal () {
-    this.terminalDiv.style.visibility = 'visible'
-  }
-
   setHoveredLink (link) {
-    this.hoveredLink = link
-    this.terminalDiv.classList.add('atom-xterm-term-container-has-link')
+    this.setState((prevState) => {
+      let classNames = new Set(prevState.className.split(/\s+/))
+      classNames.add('atom-xterm-term-container-has-link')
+      return {
+        hoveredLink: link,
+        className: Array.from(classNames).join(' ')
+      }
+    })
   }
 
   clearHoveredLink () {
-    this.terminalDiv.classList.remove('atom-xterm-term-container-has-link')
-    this.hoveredLink = null
+    this.setState((prevState) => {
+      let classNames = new Set(prevState.className.split(/\s+/))
+      classNames.delete('atom-xterm-term-container-has-link')
+      return {
+        hoveredLink: null,
+        className: Array.from(classNames).join(' ')
+      }
+    })
   }
 
   openHoveredLink () {
-    if (this.hoveredLink) {
-      shell.openExternal(this.hoveredLink)
+    if (this.state.hoveredLink) {
+      shell.openExternal(this.state.hoveredLink)
     }
   }
 
   getHoveredLink () {
-    if (this.hoveredLink) {
-      return this.hoveredLink
+    if (this.state.hoveredLink) {
+      return this.state.hoveredLink
     }
   }
 
@@ -598,17 +616,13 @@ class AtomXtermTerminalComponent extends React.Component {
 class AtomXtermMainComponent extends React.Component {
   constructor (props) {
     super(props)
-    this.componentRef = React.createRef()
     this.terminalComponentRef = React.createRef()
-    this.erd = elementResizeDetectorMaker({
-      strategy: 'scroll'
-    })
+    this.onResize = this.onResize.bind(this)
   }
 
   render () {
     return (
       <div
-        ref={this.componentRef}
         className='atom-xterm-main-div'
       >
         <AtomXtermTerminalComponent
@@ -616,14 +630,17 @@ class AtomXtermMainComponent extends React.Component {
           atomXtermModel={this.props.atomXtermModel}
           getAtomXtermComponent={this.props.getAtomXtermComponent}
         />
+        <ReactResizeDetector
+          handleWidth
+          handleHeight
+          onResize={this.onResize}
+        />
       </div>
     )
   }
 
-  componentDidMount () {
-    this.erd.listenTo(this.componentRef.current, (element) => {
-      this.terminalComponentRef.current.refitTerminal()
-    })
+  onResize () {
+    this.terminalComponentRef.current.refitTerminal()
   }
 }
 
