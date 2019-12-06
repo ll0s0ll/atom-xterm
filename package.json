@@ -44,7 +44,7 @@
     "node-pty-prebuilt": "^0.7.3"
   },
   "devDependencies": {
-    "@babel/cli": "^7.0.0-rc.1",
+    "@babel/cli": "^7.7.5",
     "@babel/core": "^7.0.0-rc.1",
     "@babel/plugin-transform-runtime": "^7.0.0-rc.1",
     "@babel/preset-env": "^7.0.0-rc.1",
