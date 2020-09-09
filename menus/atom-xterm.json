@@ -255,6 +255,26 @@
             {
               "label": "Close All Terminals",
               "command": "atom-xterm:close-all"
+            },
+            {
+              "label": "Execute preset command 1",
+              "command": "atom-xterm:executePresetCommand1"
+            },
+            {
+              "label": "Execute preset command 2",
+              "command": "atom-xterm:executePresetCommand2"
+            },
+            {
+              "label": "Execute preset command 3",
+              "command": "atom-xterm:executePresetCommand3"
+            },
+            {
+              "label": "Execute preset command 4",
+              "command": "atom-xterm:executePresetCommand4"
+            },
+            {
+              "label": "Execute preset command 5",
+              "command": "atom-xterm:executePresetCommand5"
             }
           ]
         }

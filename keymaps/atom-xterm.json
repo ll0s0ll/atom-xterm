@@ -36,7 +36,12 @@
     "cmd-alt-shift-right": "atom-xterm:open-split-right",
     "cmd-alt-shift-i": "atom-xterm:open-split-bottom-dock",
     "cmd-alt-shift-u": "atom-xterm:open-split-left-dock",
-    "cmd-alt-shift-o": "atom-xterm:open-split-right-dock"
+    "cmd-alt-shift-o": "atom-xterm:open-split-right-dock",
+    "cmd-ctrl-1": "atom-xterm:executePresetCommand1",
+    "cmd-ctrl-2": "atom-xterm:executePresetCommand2",
+    "cmd-ctrl-3": "atom-xterm:executePresetCommand3",
+    "cmd-ctrl-4": "atom-xterm:executePresetCommand4",
+    "cmd-ctrl-5": "atom-xterm:executePresetCommand5"
   },
   ".platform-linux atom-xterm": {
     "ctrl-insert": "atom-xterm:copy",
